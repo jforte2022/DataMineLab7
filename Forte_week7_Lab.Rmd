@@ -1,0 +1,296 @@
+---
+title: "Week 7: Lab - Text Mining (Sentiment Analysis)"
+author: 'Jonathan Forte'
+date: '2/21/23'
+output: html_document
+---
+
+---
+
+# Instructions
+Conduct sentiment analysis on MLK's speech to determine how positive/negative
+his speech was. Split his speech into four quartiles to see how that sentiment 
+changes over time.Create two bar charts to display your results.
+
+---
+
+```{r setup, message = FALSE}
+# Add your library below.
+library(tm)
+```
+
+# Step 1 - Read in the Bing Dictionary
+Sentiment analysis relies on a “dictionary”. Most dictionaries categorize words as either positive or negative, but some dictionaries use emotion (such as the NRC EmoLex Dictionary). Each dictionary is different. This assignment will introduce you to the **Bing dictionary**, which researchers created by categorizing words used in online reviews from Amazon, Yelp, and other similar platforms.
+
+## Step 1.1 - Find the files
+The files needed for this lab are stored in a RAR file. You must extract the files from the compressed RAR file by using a third-party application, such as 7Zip, winZip, or another program. Use google to find a RAR file extractor.
+
+Find the RAR file on the UIC website (contains two text files: positive words and negative words). This file is about halfway down the page, listed as “A list of English positive and negative opinion words or sentiment words”. Use the link below:
+
+* http://www.cs.uic.edu/~liub/FBS/sentiment-analysis.html  
+
+Save these files in your "data" folder. 
+
+```{r, "Step 1.1"}
+# No code necessary; Save the files in your project's data folder.
+```
+
+## Step 1.2 - Create vectors
+Create two vectors of words, one for the positive words and one for the 
+negative words.
+
+```{r, "Step 1.2"}
+# Write your code below.
+p <- scan(file = "data/opinion-lexicon-English/opinion-lexicon-English/positive-words.txt", character(0), sep = "\n")
+n <- scan(file = "data/opinion-lexicon-English/opinion-lexicon-English/negative-words.txt", character(0), sep = "\n")
+```
+
+## Step 1.3 - Clean the files
+Note that when reading in the word files, there might be lines at the start 
+and/or the end that will need to be removed (i.e. you should clean your dataset).
+
+```{r, "Step 1.3"}
+# Write your code below.
+p <- p[-1:-29]
+n <- n[-1:-30]
+```
+
+
+---
+
+
+# Step 2: Process in the MLK speech
+Text is stored in many different formats, such as TXT, CSV, HTML, and JSON. In this lab, you are going to experience how to “parse HTML” for text analysis.
+
+## Step 2.1 - Find and read in the file.
+Find MLK’s speech on the AnalyticTech website. You can either read in the file using the XML package, or you can copy/paste the document into a TXT file.
+
+Use the link below:
+
+* http://www.analytictech.com/mb021/mlk.htm  
+
+
+```{r, "Step 2.1"}
+# Write your code below.
+library(XML)
+```
+
+## Step 2.2 - Parse the files
+If you choose to read the raw HTML using the XML package, you will need to parse the HTML object. For this exercise, we can split the HTML by the paragraph tag and then store the paragraphs inside a vector. The following code might help:
+
+```
+# Read and parse HTML file
+
+doc.html = htmlTreeParse('http://www.analytictech.com/mb021/mlk.htm', 
+                         useInternal = TRUE)
+
+# Extract all the paragraphs (HTML tag is p, starting at
+# the root of the document). Unlist flattens the list to
+# create a character vector.
+
+doc.text = unlist(xpathApply(doc.html, '//p', xmlValue))
+
+# Replace all \n by spaces
+doc.text = gsub('\\n', ' ', doc.text)
+
+# Replace all \r by spaces
+doc.text = gsub('\\r', ' ', doc.text)
+```
+
+```{r, "Step 2.2"}
+# Write your code below, if necessary.
+htmlDoc <- htmlTreeParse('http://www.analytictech.com/mb021/mlk.htm', useInternal = TRUE)
+textDoc <- unlist(xpathApply(htmlDoc, '//p', xmlValue))
+textDoc <- gsub('\\n', ' ', textDoc)
+textDoc <- gsub('\\r', ' ', textDoc)
+textDoc <- gsub("\\.", "", textDoc)
+textDoc <- gsub(";", "", textDoc)
+textDoc <- gsub("!", "", textDoc)
+textDoc <- gsub(",", "", textDoc)
+textDoc <- gsub("'", "", textDoc)
+textDoc <- gsub(":", "", textDoc)
+textDoc <- gsub("\'", "", textDoc)
+```
+
+## Step 2.3 - Transform the text
+Text must be processed before it can be analyzed. There are many ways to process text. This class has introduced you to two ways:
+
+* Using the TM package to manipulate term-document matrices
+* Using the tidytext package to unnest tokens
+
+Either create a **term-document matrix** or **unnest the tokens**.
+
+```{r, "Step 2.3"}
+# Write your code below.
+vecText <- VectorSource(textDoc)
+textCorp <- VCorpus(vecText)
+textDocTDM <- TermDocumentMatrix(textCorp)
+textMatrix <- as.matrix(textDocTDM)
+```
+## Step 2.4 - Create a list of word frequencies
+Create a list of counts for each word.
+
+```{r, "Step 2.4"}
+# Write your code below.
+termFreq <- rowSums(textMatrix)
+termFreq <- sort(termFreq, decreasing = TRUE)
+```
+
+---
+
+# Step 3: Positive words
+Determine how many positive words were in the speech. Scale the number based on 
+the total number of words in the speech. 
+**Hint:** 
+One way to do this is to use `match()` and then `which()`. If you choose the tidyverse method, try `group_by()` and then `count()`.
+
+```{r, "Step 3"}
+# Write your code below.
+pMatch <- match(names(termFreq), p, nomatch = 0)
+pWords <- names(termFreq)[which(pMatch != 0)]
+pCount <- termFreq[which(pMatch != 0)]
+pRatio <- sum(pCount) / sum(termFreq)
+```
+
+---
+
+# Step 4: Negative words
+Determine how many negative words were in the speech. Scale the number based on the total number of words in the speech.  
+**Hint:** 
+This is basically the same as Step 3.
+
+```{r, , "Step 4"}
+# Write your code below.
+nMatch <- match(names(termFreq), n, nomatch = 0)
+nWords <- names(termFreq)[which(nMatch != 0)]
+nCount <- termFreq[which(nMatch != 0)]
+nRatio <- sum(nCount) / sum(termFreq)
+```
+
+---
+
+# Step 5: Get Quartile values
+Redo the “positive” and “negative” calculations for each 25% of the speech by
+following the steps below.
+
+## 5.1 Compare the results in a graph
+Compare the results (e.g., a simple bar chart of the 4 numbers).  
+For each quarter of the text, you calculate the positive and negative ratio, 
+as was done in Step 4 and Step 5.  
+The only extra work is to split the text to four equal parts, then 
+visualize the positive and negative ratios by plotting. 
+
+The final graphs should look like below:  
+![Step 5.1 - Negative](data/week6lab1.PNG)
+![Step 5.1 - Positive](data/week6lab2.PNG)
+
+**HINT:** 
+The code below shows how to start the first 25% of the speech.
+Finish the analysis and use the same approach for the rest of the speech.
+
+```
+# Step 5: Redo the positive and negative calculations for each 25% of the speech
+  # define a cutpoint to split the document into 4 parts; round the number to get an interger
+  cutpoint <- round(length(words.corpus)/4)
+ 
+# first 25%
+  # create word corpus for the first quarter using cutpoints
+  words.corpus1 <- words.corpus[1:cutpoint]
+  # create term document matrix for the first quarter
+  tdm1 <- TermDocumentMatrix(words.corpus1)
+  # convert tdm1 into a matrix called "m1"
+  m1 <- as.matrix(tdm1)
+  # create a list of word counts for the first quarter and sort the list
+  wordCounts1 <- rowSums(m1)
+  wordCounts1 <- sort(wordCounts1, decreasing=TRUE)
+  # calculate total words of the first 25%
+```
+
+```{r}
+# Write your code below.
+cutpoint <- round(length(textCorp)/4)
+
+words.corpus1 <- textCorp[1:cutpoint]
+tdm1 <- TermDocumentMatrix(words.corpus1)
+m1 <- as.matrix(tdm1)
+wordCounts1 <- rowSums(m1)
+wordCounts1 <- sort(wordCounts1, decreasing=TRUE)
+
+pMatch1 <- match(names(wordCounts1), p, nomatch = 0)
+pWords1 <- names(wordCounts1)[which(pMatch1 != 0)]
+pCount1 <- wordCounts1[which(pMatch1 != 0)]
+pRatio1 <- sum(pCount1) / sum(wordCounts1)
+
+nMatch1 <- match(names(wordCounts1), n, nomatch = 0)
+nWords1 <- names(wordCounts1)[which(nMatch1 != 0)]
+nCount1 <- wordCounts1[which(nMatch1 != 0)]
+nRatio1 <- sum(nCount1) / sum(wordCounts1)
+
+################################################################################
+
+words.corpus2 <- textCorp[(cutpoint + 1):(2 * cutpoint)]
+tdm2 <- TermDocumentMatrix(words.corpus2)
+m2 <- as.matrix(tdm2)
+wordCounts2 <- rowSums(m2)
+wordCounts2 <- sort(wordCounts2, decreasing=TRUE)
+
+pMatch2 <- match(names(wordCounts2), p, nomatch = 0)
+pWords2 <- names(wordCounts2)[which(pMatch2 != 0)]
+pCount2 <- wordCounts2[which(pMatch2 != 0)]
+pRatio2 <- sum(pCount2) / sum(wordCounts2)
+
+nMatch2 <- match(names(wordCounts2), n, nomatch = 0)
+nWords2 <- names(wordCounts2)[which(nMatch2 != 0)]
+nCount2 <- wordCounts2[which(nMatch2 != 0)]
+nRatio2 <- sum(nCount2) / sum(wordCounts2)
+
+################################################################################
+
+words.corpus3 <- textCorp[(2 * cutpoint + 1):(3 * cutpoint)]
+tdm3 <- TermDocumentMatrix(words.corpus3)
+m3 <- as.matrix(tdm3)
+wordCounts3 <- rowSums(m3)
+wordCounts3 <- sort(wordCounts3, decreasing=TRUE)
+
+pMatch3 <- match(names(wordCounts3), p, nomatch = 0)
+pWords3 <- names(wordCounts3)[which(pMatch3 != 0)]
+pCount3 <- wordCounts3[which(pMatch3 != 0)]
+pRatio3 <- sum(pCount3) / sum(wordCounts3)
+
+nMatch3 <- match(names(wordCounts3), n, nomatch = 0)
+nWords3 <- names(wordCounts3)[which(nMatch3 != 0)]
+nCount3 <- wordCounts3[which(nMatch3 != 0)]
+nRatio3 <- sum(nCount3) / sum(wordCounts3)
+
+################################################################################
+
+words.corpus4 <- textCorp[(3 * cutpoint + 1):length(textCorp)]
+tdm4 <- TermDocumentMatrix(words.corpus4)
+m4 <- as.matrix(tdm4)
+wordCounts4 <- rowSums(m4)
+wordCounts4 <- sort(wordCounts4, decreasing=TRUE)
+
+pMatch4 <- match(names(wordCounts4), p, nomatch = 0)
+pWords4 <- names(wordCounts4)[which(pMatch4 != 0)]
+pCount4 <- wordCounts4[which(pMatch4 != 0)]
+pRatio4 <- sum(pCount4) / sum(wordCounts4)
+
+nMatch4 <- match(names(wordCounts4), n, nomatch = 0)
+nWords4 <- names(wordCounts4)[which(nMatch4 != 0)]
+nCount4 <- wordCounts4[which(nMatch4 != 0)]
+nRatio4 <- sum(nCount4) / sum(wordCounts4)
+
+################################################################################
+pRatios <- c(pRatio1, pRatio2, pRatio3, pRatio4)
+nRatios <- c(nRatio1, nRatio2, nRatio3, nRatio4)
+barplot(pRatios, names.arg = c("1st 25%", "2nd 25%", "3rd 25%", "4th 25%"), main = "Positive Ratios")
+barplot(nRatios, names.arg = c("1st 25%", "2nd 25%", "3rd 25%", "4th 25%"), main = "Negative Ratios")
+```
+
+# 5.2 Analysis
+
+What do you see from the positive/negative ratio in the graph? 
+State what you learned from the MLK speech using the sentime of the speech, as MLK wanted to inspire the crowd. Third, MLK's positive nt analysis results: 
+
+> I learned a few things from the barplots. First, it is clear that MLK used both negative and positive emotive rhetoric in this speech. Second, it is clear that the negative emotive rhetoric dramatically falls in the final quarteremotive rhetoric dramatically spikes in the final quarter of the speech. Lastly, the highest quarterly negative ratio is only half that of the highest quarterly positive ratio, indicating that this speech was far more focused on inspiring its listeners than scarring or demoralizing them.
+
